@@ -1,9 +1,12 @@
 // Simplified prototype for a desktop viewport viewer in C++ with DirectX 11
 // Captures the desktop and displays a movable, zoomable view
+
 #include <Windows.h>
 #include <d3d11.h>
 #include <dxgi1_2.h>
 #include <wrl/client.h>
+#include <DirectXColors.h> 
+
 using namespace Microsoft::WRL;
 
 #pragma comment(lib, "d3d11.lib")
@@ -67,11 +70,52 @@ void InitD3D() {
 void CaptureAndRender() {
     DXGI_OUTDUPL_FRAME_INFO frameInfo = {};
     ComPtr<IDXGIResource> resource;
-    if (SUCCEEDED(g_duplication->AcquireNextFrame(0, &frameInfo, &resource))) {
-        resource.As(&g_desktopFrame);
-        // Normally: copy this texture to a render target and draw with transform
-        g_duplication->ReleaseFrame();
+
+    HRESULT hr = g_duplication->AcquireNextFrame(0, &frameInfo, &resource);
+    if (FAILED(hr)) return;
+
+    ComPtr<ID3D11Texture2D> frame;
+    resource.As(&frame);
+
+    // --- Static objects created only once ---
+    static ComPtr<IDXGISwapChain> swapChain;
+    static ComPtr<ID3D11RenderTargetView> rtv;
+
+    if (!swapChain) {
+        DXGI_SWAP_CHAIN_DESC scd = {};
+        scd.BufferCount = 1;
+        scd.BufferDesc.Format = DXGI_FORMAT_B8G8R8A8_UNORM;
+        scd.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
+        scd.OutputWindow = g_hwnd;
+        scd.SampleDesc.Count = 1;
+        scd.Windowed = TRUE;
+        scd.SwapEffect = DXGI_SWAP_EFFECT_DISCARD;
+
+        ComPtr<IDXGIDevice> dxgiDevice;
+        g_device.As(&dxgiDevice);
+        ComPtr<IDXGIAdapter> adapter;
+        dxgiDevice->GetAdapter(&adapter);
+        ComPtr<IDXGIFactory> factory;
+        adapter->GetParent(__uuidof(IDXGIFactory), &factory);
+
+        factory->CreateSwapChain(g_device.Get(), &scd, &swapChain);
+
+        // Create render target view
+        ComPtr<ID3D11Texture2D> backBuffer;
+        swapChain->GetBuffer(0, IID_PPV_ARGS(&backBuffer));
+        g_device->CreateRenderTargetView(backBuffer.Get(), nullptr, &rtv);
     }
+
+    // Copy desktop frame directly to back buffer
+    ComPtr<ID3D11Texture2D> backBuffer;
+    swapChain->GetBuffer(0, IID_PPV_ARGS(&backBuffer));
+    g_context->CopyResource(backBuffer.Get(), frame.Get());
+
+    // Present it
+    g_context->OMSetRenderTargets(1, rtv.GetAddressOf(), nullptr);
+    swapChain->Present(1, 0);
+
+    g_duplication->ReleaseFrame();
 }
 
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int) {

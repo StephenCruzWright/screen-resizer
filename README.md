@@ -1,6 +1,6 @@
 # Screen Resizer
 
-The **Screen Resizer** project is a tool designed to help users easily adjust and manage screen resolutions. Whether you're a developer testing responsive designs or a user needing quick resolution changes, this tool simplifies the process.
+The **Screen Resizer** project is a tool designed to help users easily adjust and manage screen resolutions. Whether you're a developer testing responsive designs or a user needing quick resolution changes for their broken screen, this tool simplifies the process.
 
 ## Features
 
