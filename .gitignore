@@ -1,0 +1,40 @@
+# Compiled binaries and build artifacts
+/build/
+/Debug/
+/Release/
+/*.exe
+/*.obj
+/*.pdb
+/*.ilk
+/*.log
+
+# CMake generated files
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+Makefile
+
+# VSCode
+.vscode/settings.json
+.vscode/launch.json
+.vscode/tasks.json
+
+# User-specific
+*.user
+*.suo
+*.VC.db
+*.vcxproj*
+*.code-workspace
+
+# OS-specific
+.DS_Store
+Thumbs.db
+
+# Logs and crash dumps
+*.log
+*.dmp
+*.stackdump
+*.pid
+*.pid.lock
+*.seed
+*.seed.lock
