@@ -13,7 +13,7 @@ The **Screen Resizer** project is a tool designed to help users easily adjust an
 
 1. Clone the repository:
     ```bash
-    git clone https://github.com/stephencruzwright/screen-resizer.git
+    git clone https://github.com/Low-Priority-Citizen/screen-resizer.git
     ```
 2. Navigate to the project directory:
     ```bash
