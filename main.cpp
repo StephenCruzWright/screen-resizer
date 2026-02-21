@@ -1,4 +1,9 @@
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+
 #include <Windows.h>
+#include <Windowsx.h>
 #include <d3d11.h>
 #include <d3dcompiler.h>
 #include <dxgi1_2.h>
@@ -6,6 +11,8 @@
 
 #include <algorithm>
 #include <cstring>
+
+#include "app/app_state.h"
 
 using namespace Microsoft::WRL;
 
@@ -77,6 +84,34 @@ bool g_hasSelection = false;
 DragMode g_dragMode = DragMode::None;
 POINT g_dragStart = {};
 SelectionRect g_dragStartSelection;
+app::AppState g_appState;
+
+void ApplySettingsToRuntime() {
+    g_offsetX = g_appState.settings.viewportOffsetX;
+    g_offsetY = g_appState.settings.viewportOffsetY;
+    g_zoom = std::clamp(g_appState.settings.zoom, 0.2f, 4.0f);
+
+    if (g_hwnd) {
+        SetWindowPos(
+            g_hwnd,
+            HWND_TOPMOST,
+            0,
+            0,
+            g_appState.settings.viewportWidth,
+            g_appState.settings.viewportHeight,
+            SWP_NOMOVE | SWP_NOACTIVATE);
+    }
+}
+
+void ToggleSettingsWindow(HINSTANCE) {
+    // Placeholder until a dedicated settings UI is implemented.
+    // Re-apply persisted settings and save to ensure any runtime updates are kept.
+    ApplySettingsToRuntime();
+    g_appState.settings.viewportOffsetX = g_offsetX;
+    g_appState.settings.viewportOffsetY = g_offsetY;
+    g_appState.settings.zoom = g_zoom;
+    g_appState.Save();
+}
 
 float Clamp01(float v) {
     return std::clamp(v, 0.0f, 1.0f);
@@ -406,11 +441,6 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
             } else if (wParam == 'S') {
                 ToggleSettingsWindow(reinterpret_cast<HINSTANCE>(GetWindowLongPtr(hwnd, GWLP_HINSTANCE)));
             }
-            if (wParam == VK_ESCAPE) {
-                PostQuitMessage(0);
-            } else if (wParam == 'S') {
-                ToggleSettingsWindow(reinterpret_cast<HINSTANCE>(GetWindowLongPtr(hwnd, GWLP_HINSTANCE)));
-            }
             return 0;
     }
     return DefWindowProc(hwnd, msg, wParam, lParam);
@@ -425,7 +455,6 @@ void InitWindow(HINSTANCE hInstance) {
 
     g_hwnd = CreateWindowExW(WS_EX_TOPMOST | WS_EX_LAYERED,
         L"ScreenResizer", L"Virtual Viewport", WS_POPUP,
-        0, 0, g_appState.settings.viewportWidth, g_appState.settings.viewportHeight,
         0, 0, g_appState.settings.viewportWidth, g_appState.settings.viewportHeight,
         nullptr, nullptr, hInstance, nullptr);
 
@@ -571,9 +600,7 @@ void CaptureAndRender() {
 
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int) {
     g_appState.Initialize();
-    g_appState.Initialize();
     InitWindow(hInstance);
-    ApplySettingsToRuntime();
     ApplySettingsToRuntime();
     InitD3D();
 
