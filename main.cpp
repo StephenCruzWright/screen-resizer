@@ -126,7 +126,7 @@ void LayoutUi() {
     MoveWindow(g_toggleInstructionsButton, left + (buttonW + 8) * 2, top, buttonW + 30, 32, TRUE);
 
     const int labelTop = top + 44;
-    MoveWindow(g_instructionsLabel, left, labelTop, panelW, std::max(120, rc.bottom - labelTop - 16), TRUE);
+    MoveWindow(g_instructionsLabel, left, labelTop, panelW, std::max(120, static_cast<int>(rc.bottom - labelTop - 16)), TRUE);
     ShowWindow(g_instructionsLabel, g_instructionsVisible ? SW_SHOW : SW_HIDE);
 }
 
