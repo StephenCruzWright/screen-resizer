@@ -1,63 +1,72 @@
 # Screen Resizer
 
-The **Screen Resizer** project is a tool designed to help users easily adjust and manage screen resolutions. Whether you're a developer testing responsive designs or a user needing quick resolution changes for their broken screen, this tool simplifies the process.
+**Screen Resizer** is a Windows desktop prototype written in C++/Win32 + Direct3D 11. It currently captures the desktop via DXGI output duplication and presents it in a full-screen topmost window.
 
-## Features
+## Prerequisites
 
-- Quickly switch between predefined screen resolutions.
-- Add custom resolutions as per your requirements.
-- User-friendly interface for seamless operation.
-- Lightweight and efficient.
+- **Operating system:** Windows 10 or Windows 11 (64-bit).
+- **Build tools (option A):** Visual Studio 2022 (or Build Tools 2022) with the **Desktop development with C++** workload installed.
+- **Build tools (option B):** Ninja + MSVC toolchain available from a Developer Command Prompt.
+- **CMake:** 3.10 or newer (`cmake --version`).
+- **DirectX runtime/SDK assumptions:**
+  - Uses Direct3D 11 and DXGI APIs provided by the Windows SDK / system runtime.
+  - No separate legacy DirectX SDK install is required.
 
-## Installation
+## Configure and build
 
-1. Clone the repository:
-    ```bash
-    git clone https://github.com/Low-Priority-Citizen/screen-resizer.git
-    ```
-2. Navigate to the project directory:
-    ```bash
-    cd screen-resizer
-    ```
-3. Install dependencies:
-    ```bash
-    npm install
-    ```
+Run these commands from the repository root.
 
-## Usage
+### Option 1: CMake + Visual Studio / MSBuild
 
-1. Start the application:
-    ```bash
-    npm start
-    ```
-2. Follow the on-screen instructions to select or customize screen resolutions.
+```powershell
+cmake -S . -B build -G "Visual Studio 17 2022" -A x64
+cmake --build build --config Release
+```
+
+### Option 2: CMake + Ninja
+
+```powershell
+cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+cmake --build build
+```
+
+## Run
+
+After a successful build, launch the executable:
+
+- **Visual Studio generator:** `build\Release\ScreenResizer.exe`
+- **Ninja generator:** `build\ScreenResizer.exe`
+
+You can close the prototype by pressing **Esc**.
+
+## Current status
+
+This project is an **early prototype**.
+
+### Implemented
+
+- Win32 application entry point with a full-screen topmost window.
+- Direct3D 11 device initialization.
+- DXGI desktop duplication capture.
+- Per-frame copy/present loop to display captured desktop content.
+
+### Planned
+
+- Real viewport scaling/zoom behavior.
+- Adjustable offsets/panning controls.
+- Resolution presets and custom resolution workflows.
+- Improved interaction model and production-grade error handling.
 
 ## Contributing
 
-Contributions are welcome! To contribute:
-
-1. Fork the repository.
-2. Create a new branch:
-    ```bash
-    git checkout -b feature-name
-    ```
-3. Commit your changes:
-    ```bash
-    git commit -m "Add feature-name"
-    ```
-4. Push to your branch:
-    ```bash
-    git push origin feature-name
-    ```
-5. Open a pull request.
+Contributions are welcome. Please open an issue or pull request with a clear description of the change.
 
 ## License
 
 This project is licensed under the [MIT License](LICENSE).
 
-## Contact
 
-For questions or feedback, please reach out to [stephencruzwright@gmail.com](mailto:stephencruzwright@gmail.com).
+## Configuration
 
----
-*Happy resizing!*
+The app now persists settings to `%LocalAppData%/ScreenResizer/settings.json` and restores them at startup.
+Press `S` while the app is focused to open the Settings window for viewport/profile/startup options.
