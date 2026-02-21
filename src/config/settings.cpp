@@ -1,7 +1,9 @@
 #include "settings.h"
 
+#ifdef _WIN32
 #include <Windows.h>
 #include <ShlObj.h>
+#endif
 
 #include <algorithm>
 #include <filesystem>
@@ -48,6 +50,36 @@ std::optional<bool> ExtractBool(const std::string& raw, const std::string& key) 
     return std::nullopt;
 }
 
+std::string EscapeJsonString(const std::string& input) {
+    std::string out;
+    out.reserve(input.size());
+
+    for (char c : input) {
+        switch (c) {
+            case '\\':
+                out += "\\\\";
+                break;
+            case '"':
+                out += "\\\"";
+                break;
+            case '\n':
+                out += "\\n";
+                break;
+            case '\r':
+                out += "\\r";
+                break;
+            case '\t':
+                out += "\\t";
+                break;
+            default:
+                out += c;
+                break;
+        }
+    }
+
+    return out;
+}
+
 }  // namespace
 
 namespace config {
@@ -57,6 +89,7 @@ Settings SettingsStore::Defaults() {
 }
 
 std::wstring SettingsStore::ConfigPath() {
+#ifdef _WIN32
     PWSTR localAppData = nullptr;
     if (FAILED(SHGetKnownFolderPath(FOLDERID_LocalAppData, 0, nullptr, &localAppData))) {
         return L"settings.json";
@@ -69,6 +102,11 @@ std::wstring SettingsStore::ConfigPath() {
     std::filesystem::create_directories(path);
     path /= L"settings.json";
     return path.wstring();
+#else
+    std::filesystem::path path = std::filesystem::current_path();
+    path /= "settings.json";
+    return path.wstring();
+#endif
 }
 
 Settings SettingsStore::ParseAndValidate(const std::string& raw, bool* ok) {
@@ -134,7 +172,7 @@ Settings SettingsStore::ParseAndValidate(const std::string& raw, bool* ok) {
 }
 
 Settings SettingsStore::LoadWithValidation() {
-    std::ifstream in(ConfigPath());
+    std::ifstream in{std::filesystem::path(ConfigPath())};
     if (!in.is_open()) {
         return Defaults();
     }
@@ -151,20 +189,20 @@ Settings SettingsStore::LoadWithValidation() {
 }
 
 bool SettingsStore::Save(const Settings& settings) {
-    std::ofstream out(ConfigPath(), std::ios::trunc);
+    std::ofstream out{std::filesystem::path(ConfigPath()), std::ios::trunc};
     if (!out.is_open()) {
         return false;
     }
 
     out << "{\n";
     out << "  \"onboardingComplete\": " << (settings.onboardingComplete ? "true" : "false") << ",\n";
-    out << "  \"introFlowState\": \"" << settings.introFlowState << "\",\n";
+    out << "  \"introFlowState\": \"" << EscapeJsonString(settings.introFlowState) << "\",\n";
     out << "  \"viewportWidth\": " << settings.viewportWidth << ",\n";
     out << "  \"viewportHeight\": " << settings.viewportHeight << ",\n";
     out << "  \"viewportOffsetX\": " << settings.viewportOffsetX << ",\n";
     out << "  \"viewportOffsetY\": " << settings.viewportOffsetY << ",\n";
     out << "  \"zoom\": " << settings.zoom << ",\n";
-    out << "  \"profileName\": \"" << settings.profileName << "\",\n";
+    out << "  \"profileName\": \"" << EscapeJsonString(settings.profileName) << "\",\n";
     out << "  \"launchAtStartup\": " << (settings.launchAtStartup ? "true" : "false") << "\n";
     out << "}\n";
 

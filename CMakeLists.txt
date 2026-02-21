@@ -28,7 +28,12 @@ else()
   message(STATUS "ScreenResizer app target is only built on Windows; building test targets only.")
 endif()
 
-add_executable(tests tests/test_main.cpp)
+add_executable(tests
+    tests/test_main.cpp
+    src/config/settings.cpp
+)
+
+target_include_directories(tests PRIVATE src)
 
 enable_testing()
 add_test(NAME tests COMMAND tests)
