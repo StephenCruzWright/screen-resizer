@@ -11,6 +11,7 @@
 
 #include <algorithm>
 #include <cstring>
+#include <string>
 
 #include "app/app_state.h"
 
@@ -20,10 +21,10 @@ using namespace Microsoft::WRL;
 #pragma comment(lib, "d3dcompiler.lib")
 
 struct SelectionRect {
-    float left = 0.2f;
-    float top = 0.2f;
-    float right = 0.8f;
-    float bottom = 0.8f;
+    float left = 0.0f;
+    float top = 0.0f;
+    float right = 1.0f;
+    float bottom = 1.0f;
 };
 
 enum class DragMode {
@@ -85,22 +86,65 @@ DragMode g_dragMode = DragMode::None;
 POINT g_dragStart = {};
 SelectionRect g_dragStartSelection;
 app::AppState g_appState;
+SelectionRect g_confirmedViewport;
+bool g_viewportConfirmed = false;
+RECT g_monitorRect = { 0, 0, 1, 1 };
+HWND g_confirmButton = nullptr;
+HWND g_resetButton = nullptr;
+HWND g_toggleInstructionsButton = nullptr;
+HWND g_instructionsLabel = nullptr;
+bool g_instructionsVisible = true;
+
+constexpr int kConfirmButtonId = 1001;
+constexpr int kResetButtonId = 1002;
+constexpr int kInstructionsButtonId = 1003;
+
+void NormalizeSelection(SelectionRect& sel);
+
+HMENU MenuIdToHmenu(int id) {
+    return reinterpret_cast<HMENU>(static_cast<UINT_PTR>(id));
+}
 
 void ApplySettingsToRuntime() {
     g_offsetX = g_appState.settings.viewportOffsetX;
     g_offsetY = g_appState.settings.viewportOffsetY;
     g_zoom = std::clamp(g_appState.settings.zoom, 0.2f, 4.0f);
+}
 
-    if (g_hwnd) {
-        SetWindowPos(
-            g_hwnd,
-            HWND_TOPMOST,
-            0,
-            0,
-            g_appState.settings.viewportWidth,
-            g_appState.settings.viewportHeight,
-            SWP_NOMOVE | SWP_NOACTIVATE);
-    }
+void LayoutUi() {
+    if (!g_hwnd || !g_confirmButton) return;
+
+    RECT rc{};
+    GetClientRect(g_hwnd, &rc);
+    const int panelW = 360;
+    const int buttonW = 100;
+    const int top = 18;
+    const int left = 18;
+
+    MoveWindow(g_confirmButton, left, top, buttonW, 32, TRUE);
+    MoveWindow(g_resetButton, left + buttonW + 8, top, buttonW, 32, TRUE);
+    MoveWindow(g_toggleInstructionsButton, left + (buttonW + 8) * 2, top, buttonW + 30, 32, TRUE);
+
+    const int labelTop = top + 44;
+    MoveWindow(g_instructionsLabel, left, labelTop, panelW, std::max(120, rc.bottom - labelTop - 16), TRUE);
+    ShowWindow(g_instructionsLabel, g_instructionsVisible ? SW_SHOW : SW_HIDE);
+}
+
+void ConfirmSelection() {
+    SelectionRect chosen = g_hasSelection ? g_selection : SelectionRect{};
+    NormalizeSelection(chosen);
+    g_confirmedViewport = chosen;
+    g_viewportConfirmed = true;
+}
+
+void ResetSelection() {
+    g_hasSelection = false;
+    g_selection = SelectionRect{};
+    g_confirmedViewport = SelectionRect{};
+    g_viewportConfirmed = false;
+    g_offsetX = 0.0f;
+    g_offsetY = 0.0f;
+    g_zoom = 1.0f;
 }
 
 void ToggleSettingsWindow(HINSTANCE) {
@@ -298,7 +342,8 @@ cbuffer SceneCB : register(b0) {
     float _pad0;
 };
 float4 main(float4 pos : SV_POSITION, float2 uv : TEXCOORD0) : SV_TARGET {
-    float2 centered = (uv - 0.5) / max(viewZoom, 0.05) + 0.5 + viewOffset;
+    float2 adjustedUv = float2(1.0 - uv.x, uv.y);
+    float2 centered = (adjustedUv - 0.5) / max(viewZoom, 0.05) + 0.5 + viewOffset;
     centered = saturate(centered);
     float2 srcUv = uvMin + centered * uvSize;
     return srcTex.Sample(sampLinear, srcUv);
@@ -314,7 +359,9 @@ cbuffer OverlayCB : register(b1) {
 };
 float4 main(float4 pos : SV_POSITION, float2 uv : TEXCOORD0) : SV_TARGET {
     float inRect = step(selectionRect.x, uv.x) * step(uv.x, selectionRect.z) * step(selectionRect.y, uv.y) * step(uv.y, selectionRect.w);
-    float4 color = float4(0.0, 0.0, 0.0, (1.0 - inRect) * dimAlpha);
+    float vignette = saturate(distance(uv, float2(0.5, 0.5)) * 1.4);
+    float3 tint = lerp(float3(0.06, 0.07, 0.12), float3(0.01, 0.01, 0.02), vignette);
+    float4 color = float4(tint, (1.0 - inRect) * dimAlpha);
 
     float leftEdge = abs(uv.x - selectionRect.x) < borderThickness;
     float rightEdge = abs(uv.x - selectionRect.z) < borderThickness;
@@ -324,7 +371,7 @@ float4 main(float4 pos : SV_POSITION, float2 uv : TEXCOORD0) : SV_TARGET {
     float onVert = (leftEdge || rightEdge) && uv.y >= selectionRect.y && uv.y <= selectionRect.w;
     float onHorz = (topEdge || botEdge) && uv.x >= selectionRect.x && uv.x <= selectionRect.z;
     if (onVert || onHorz) {
-        color = float4(1.0, 0.9, 0.1, 0.95);
+        color = float4(0.1, 0.8, 1.0, 0.95);
     }
     return color;
 }
@@ -350,10 +397,11 @@ float4 main(float4 pos : SV_POSITION, float2 uv : TEXCOORD0) : SV_TARGET {
     g_device->CreateBuffer(&cbd, nullptr, &g_overlayConstantBuffer);
 
     D3D11_SAMPLER_DESC samp{};
-    samp.Filter = D3D11_FILTER_MIN_MAG_MIP_LINEAR;
+    samp.Filter = D3D11_FILTER_ANISOTROPIC;
     samp.AddressU = D3D11_TEXTURE_ADDRESS_CLAMP;
     samp.AddressV = D3D11_TEXTURE_ADDRESS_CLAMP;
     samp.AddressW = D3D11_TEXTURE_ADDRESS_CLAMP;
+    samp.MaxAnisotropy = 8;
     samp.MaxLOD = D3D11_FLOAT32_MAX;
     g_device->CreateSamplerState(&samp, &g_sampler);
 
@@ -378,6 +426,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
             if (g_swapChain) {
                 CreateSwapChainResources(LOWORD(lParam), HIWORD(lParam));
             }
+            LayoutUi();
             return 0;
         case WM_MOUSEWHEEL: {
             short delta = GET_WHEEL_DELTA_WPARAM(wParam);
@@ -438,8 +487,31 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
         case WM_KEYDOWN:
             if (wParam == VK_ESCAPE) {
                 PostQuitMessage(0);
+            } else if (wParam == VK_RETURN) {
+                ConfirmSelection();
             } else if (wParam == 'S') {
                 ToggleSettingsWindow(reinterpret_cast<HINSTANCE>(GetWindowLongPtr(hwnd, GWLP_HINSTANCE)));
+            } else if (wParam == 'I') {
+                g_instructionsVisible = !g_instructionsVisible;
+                LayoutUi();
+            }
+            return 0;
+        case WM_COMMAND:
+            if (HIWORD(wParam) == BN_CLICKED) {
+                switch (LOWORD(wParam)) {
+                    case kConfirmButtonId:
+                        ConfirmSelection();
+                        return 0;
+                    case kResetButtonId:
+                        ResetSelection();
+                        return 0;
+                    case kInstructionsButtonId:
+                        g_instructionsVisible = !g_instructionsVisible;
+                        LayoutUi();
+                        return 0;
+                    default:
+                        break;
+                }
             }
             return 0;
     }
@@ -453,12 +525,40 @@ void InitWindow(HINSTANCE hInstance) {
     wc.lpszClassName = L"ScreenResizer";
     RegisterClassW(&wc);
 
+    g_monitorRect = { 0, 0, GetSystemMetrics(SM_CXSCREEN), GetSystemMetrics(SM_CYSCREEN) };
+
     g_hwnd = CreateWindowExW(WS_EX_TOPMOST | WS_EX_LAYERED,
         L"ScreenResizer", L"Virtual Viewport", WS_POPUP,
-        0, 0, g_appState.settings.viewportWidth, g_appState.settings.viewportHeight,
+        g_monitorRect.left, g_monitorRect.top,
+        g_monitorRect.right - g_monitorRect.left,
+        g_monitorRect.bottom - g_monitorRect.top,
         nullptr, nullptr, hInstance, nullptr);
 
+    g_confirmButton = CreateWindowW(L"BUTTON", L"Confirm (Enter)",
+        WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
+        18, 18, 100, 32, g_hwnd, MenuIdToHmenu(kConfirmButtonId), hInstance, nullptr);
+    g_resetButton = CreateWindowW(L"BUTTON", L"Reset",
+        WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
+        126, 18, 100, 32, g_hwnd, MenuIdToHmenu(kResetButtonId), hInstance, nullptr);
+    g_toggleInstructionsButton = CreateWindowW(L"BUTTON", L"Instructions",
+        WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
+        234, 18, 130, 32, g_hwnd, MenuIdToHmenu(kInstructionsButtonId), hInstance, nullptr);
+
+    std::wstring instructions =
+        L"Screen Resizer Controls\r\n"
+        L"- Drag left mouse to create/adjust area\r\n"
+        L"- Mouse wheel: zoom\r\n"
+        L"- Middle mouse drag: pan\r\n"
+        L"- Enter or Confirm: apply selected viewport\r\n"
+        L"- I: toggle this instructions panel\r\n"
+        L"- Reset: return to full-screen desktop\r\n"
+        L"- Esc: exit";
+    g_instructionsLabel = CreateWindowW(L"STATIC", instructions.c_str(),
+        WS_CHILD | WS_VISIBLE | SS_LEFT,
+        18, 62, 360, 200, g_hwnd, nullptr, hInstance, nullptr);
+
     SetLayeredWindowAttributes(g_hwnd, 0, 255, LWA_ALPHA);
+    LayoutUi();
     ShowWindow(g_hwnd, SW_SHOW);
 }
 
@@ -548,7 +648,7 @@ void CaptureAndRender() {
     vp.MaxDepth = 1.0f;
     g_context->RSSetViewports(1, &vp);
 
-    SelectionRect selected = g_hasSelection ? g_selection : SelectionRect{};
+    SelectionRect selected = g_viewportConfirmed ? g_confirmedViewport : SelectionRect{};
     NormalizeSelection(selected);
 
     SceneConstants scene{};
@@ -574,12 +674,14 @@ void CaptureAndRender() {
     g_context->Draw(3, 0);
 
     OverlayConstants overlay{};
-    overlay.selectionRect[0] = selected.left;
-    overlay.selectionRect[1] = selected.top;
-    overlay.selectionRect[2] = selected.right;
-    overlay.selectionRect[3] = selected.bottom;
+    SelectionRect editingRect = g_hasSelection ? g_selection : SelectionRect{};
+    NormalizeSelection(editingRect);
+    overlay.selectionRect[0] = editingRect.left;
+    overlay.selectionRect[1] = editingRect.top;
+    overlay.selectionRect[2] = editingRect.right;
+    overlay.selectionRect[3] = editingRect.bottom;
     overlay.borderThickness = 2.0f / std::max(1.0f, vp.Width);
-    overlay.dimAlpha = 0.35f;
+    overlay.dimAlpha = g_viewportConfirmed ? 0.0f : 0.52f;
 
     g_context->Map(g_overlayConstantBuffer.Get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped);
     memcpy(mapped.pData, &overlay, sizeof(overlay));
