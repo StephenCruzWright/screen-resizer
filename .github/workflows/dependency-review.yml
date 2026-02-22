@@ -2,6 +2,9 @@ name: Dependency Review
 
 on:
   pull_request:
+    branches: ["main"]
+  pull_request_target:
+    branches: ["main"]
 
 permissions:
   contents: read
@@ -14,8 +17,5 @@ jobs:
       pull-requests: write
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
       - name: Dependency review
         uses: actions/dependency-review-action@v4
