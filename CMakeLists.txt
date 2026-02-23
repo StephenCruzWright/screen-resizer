@@ -36,4 +36,4 @@ add_executable(tests
 target_include_directories(tests PRIVATE src)
 
 enable_testing()
-add_test(NAME tests COMMAND tests)
+add_test(NAME tests COMMAND $<TARGET_FILE:tests>)

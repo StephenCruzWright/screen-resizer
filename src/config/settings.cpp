@@ -90,6 +90,11 @@ Settings SettingsStore::Defaults() {
 
 std::wstring SettingsStore::ConfigPath() {
 #ifdef _WIN32
+    const std::filesystem::path localSettings = std::filesystem::current_path() / L"settings.json";
+    if (std::filesystem::exists(localSettings)) {
+        return localSettings.wstring();
+    }
+
     PWSTR localAppData = nullptr;
     if (FAILED(SHGetKnownFolderPath(FOLDERID_LocalAppData, 0, nullptr, &localAppData))) {
         return L"settings.json";
