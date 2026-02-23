@@ -46,4 +46,17 @@ set_target_properties(tests PROPERTIES
 target_include_directories(tests PRIVATE src)
 
 enable_testing()
+
+# Multi-config generators (Visual Studio, Ninja Multi-Config) require
+# `ctest -C <config>` unless CTEST_CONFIGURATION_TYPE is set. Default to
+# Debug so plain `ctest --test-dir build` works in local workflows.
+file(WRITE "${CMAKE_BINARY_DIR}/CTestDefaultConfig.cmake"
+    "if(NOT CTEST_CONFIGURATION_TYPE)\n"
+    "  set(CTEST_CONFIGURATION_TYPE Debug)\n"
+    "endif()\n"
+)
+set_directory_properties(PROPERTIES
+    TEST_INCLUDE_FILE "${CMAKE_BINARY_DIR}/CTestDefaultConfig.cmake"
+)
+
 add_test(NAME tests COMMAND "${CMAKE_BINARY_DIR}/bin/tests${CMAKE_EXECUTABLE_SUFFIX}")
