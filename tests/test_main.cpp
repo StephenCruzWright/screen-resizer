@@ -55,6 +55,30 @@ bool TestInvalidValuesAreSanitized() {
          Assert(settings.launchAtStartup, "valid bool should be preserved");
 }
 
+
+
+bool TestLoadUnescapesJsonStrings() {
+  const std::filesystem::path original = std::filesystem::current_path();
+  const std::filesystem::path tempDir = original / "test_output" / "load_escaped_strings";
+  std::filesystem::create_directories(tempDir);
+  std::filesystem::current_path(tempDir);
+
+  std::ofstream out("settings.json", std::ios::trunc);
+  out << "{\n"
+         "  \"profileName\": \"Main \\\"Display\\\"\",\n"
+         "  \"introFlowState\": \"done\\\\final\"\n"
+         "}\n";
+  out.close();
+
+  const config::Settings settings = config::SettingsStore::LoadWithValidation();
+  std::filesystem::current_path(original);
+
+  return Assert(settings.profileName == "Main \"Display\"",
+                "escaped quote should be unescaped when loading") &&
+         Assert(settings.introFlowState == "done\\final",
+                "escaped backslash should be unescaped when loading");
+}
+
 bool TestSaveEscapesJsonStrings() {
   const std::filesystem::path original = std::filesystem::current_path();
   const std::filesystem::path tempDir = original / "test_output" / "escaped_strings";
@@ -80,7 +104,7 @@ bool TestSaveEscapesJsonStrings() {
 }  // namespace
 
 int main() {
-  if (!TestDefaultsWhenMissingFile() || !TestInvalidValuesAreSanitized() || !TestSaveEscapesJsonStrings()) {
+  if (!TestDefaultsWhenMissingFile() || !TestInvalidValuesAreSanitized() || !TestLoadUnescapesJsonStrings() || !TestSaveEscapesJsonStrings()) {
     return 1;
   }
 

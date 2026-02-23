@@ -33,7 +33,17 @@ add_executable(tests
     src/config/settings.cpp
 )
 
+# Make test binary path configuration-independent so `ctest` can run on
+# single-config and multi-config generators without requiring `-C`.
+set_target_properties(tests PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
+    RUNTIME_OUTPUT_DIRECTORY_DEBUG "${CMAKE_BINARY_DIR}/bin"
+    RUNTIME_OUTPUT_DIRECTORY_RELEASE "${CMAKE_BINARY_DIR}/bin"
+    RUNTIME_OUTPUT_DIRECTORY_RELWITHDEBINFO "${CMAKE_BINARY_DIR}/bin"
+    RUNTIME_OUTPUT_DIRECTORY_MINSIZEREL "${CMAKE_BINARY_DIR}/bin"
+)
+
 target_include_directories(tests PRIVATE src)
 
 enable_testing()
-add_test(NAME tests COMMAND $<TARGET_FILE:tests>)
+add_test(NAME tests COMMAND "${CMAKE_BINARY_DIR}/bin/tests${CMAKE_EXECUTABLE_SUFFIX}")
