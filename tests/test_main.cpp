@@ -1,6 +1,8 @@
+#include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <string>
 
 #include "config/settings.h"
 
@@ -14,12 +16,26 @@ bool Assert(bool condition, const char* message) {
   return true;
 }
 
+bool UseTempConfigPath(const std::filesystem::path& configPath) {
+#ifdef _WIN32
+  return _putenv_s("SCREEN_RESIZER_CONFIG_PATH", configPath.string().c_str()) == 0;
+#else
+  return setenv("SCREEN_RESIZER_CONFIG_PATH", configPath.string().c_str(), 1) == 0;
+#endif
+}
+
 bool TestDefaultsWhenMissingFile() {
   const std::filesystem::path original = std::filesystem::current_path();
   const std::filesystem::path tempDir = original / "test_output" / "missing_file";
   std::filesystem::create_directories(tempDir);
-  std::filesystem::remove(tempDir / "settings.json");
+  const std::filesystem::path configPath = tempDir / "settings.json";
+  std::filesystem::remove(configPath);
   std::filesystem::current_path(tempDir);
+
+  if (!UseTempConfigPath(configPath)) {
+    std::filesystem::current_path(original);
+    return Assert(false, "failed to set config path override");
+  }
 
   const config::Settings settings = config::SettingsStore::LoadWithValidation();
   std::filesystem::current_path(original);
@@ -33,9 +49,15 @@ bool TestInvalidValuesAreSanitized() {
   const std::filesystem::path original = std::filesystem::current_path();
   const std::filesystem::path tempDir = original / "test_output" / "invalid_values";
   std::filesystem::create_directories(tempDir);
+  const std::filesystem::path configPath = tempDir / "settings.json";
   std::filesystem::current_path(tempDir);
 
-  std::ofstream out("settings.json", std::ios::trunc);
+  if (!UseTempConfigPath(configPath)) {
+    std::filesystem::current_path(original);
+    return Assert(false, "failed to set config path override");
+  }
+
+  std::ofstream out(configPath, std::ios::trunc);
   out << "{\n"
          "  \"viewportWidth\": 10,\n"
          "  \"viewportHeight\": 720,\n"
@@ -61,9 +83,15 @@ bool TestLoadUnescapesJsonStrings() {
   const std::filesystem::path original = std::filesystem::current_path();
   const std::filesystem::path tempDir = original / "test_output" / "load_escaped_strings";
   std::filesystem::create_directories(tempDir);
+  const std::filesystem::path configPath = tempDir / "settings.json";
   std::filesystem::current_path(tempDir);
 
-  std::ofstream out("settings.json", std::ios::trunc);
+  if (!UseTempConfigPath(configPath)) {
+    std::filesystem::current_path(original);
+    return Assert(false, "failed to set config path override");
+  }
+
+  std::ofstream out(configPath, std::ios::trunc);
   out << "{\n"
          "  \"profileName\": \"Main \\\"Display\\\"\",\n"
          "  \"introFlowState\": \"done\\\\final\"\n"
@@ -83,14 +111,20 @@ bool TestSaveEscapesJsonStrings() {
   const std::filesystem::path original = std::filesystem::current_path();
   const std::filesystem::path tempDir = original / "test_output" / "escaped_strings";
   std::filesystem::create_directories(tempDir);
+  const std::filesystem::path configPath = tempDir / "settings.json";
   std::filesystem::current_path(tempDir);
+
+  if (!UseTempConfigPath(configPath)) {
+    std::filesystem::current_path(original);
+    return Assert(false, "failed to set config path override");
+  }
 
   config::Settings settings = config::SettingsStore::Defaults();
   settings.profileName = "Main \"Display\"";
   settings.introFlowState = "done\\final";
 
   const bool saved = config::SettingsStore::Save(settings);
-  std::ifstream in("settings.json");
+  std::ifstream in(configPath);
   std::string raw((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
   std::filesystem::current_path(original);
 

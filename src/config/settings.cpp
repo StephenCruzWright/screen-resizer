@@ -9,6 +9,7 @@
 #endif
 
 #include <algorithm>
+#include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <limits>
@@ -171,6 +172,20 @@ Settings SettingsStore::Defaults() {
 }
 
 std::wstring SettingsStore::ConfigPath() {
+#ifdef _WIN32
+    if (const wchar_t* overridePath = _wgetenv(L"SCREEN_RESIZER_CONFIG_PATH")) {
+        if (overridePath[0] != L'\0') {
+            return std::filesystem::path(overridePath).wstring();
+        }
+    }
+#else
+    if (const char* overridePath = std::getenv("SCREEN_RESIZER_CONFIG_PATH")) {
+        if (overridePath[0] != '\0') {
+            return std::filesystem::path(overridePath).wstring();
+        }
+    }
+#endif
+
 #ifdef _WIN32
     const std::filesystem::path localSettings = std::filesystem::current_path() / L"settings.json";
     if (std::filesystem::exists(localSettings)) {
