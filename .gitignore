@@ -1,5 +1,6 @@
 # Compiled binaries and build artifacts
 /build/
+/build-*/
 /Debug/
 /Release/
 /*.exe

@@ -15,6 +15,7 @@
 #include <limits>
 #include <optional>
 #include <sstream>
+#include <type_traits>
 
 namespace {
 
@@ -36,6 +37,25 @@ std::optional<size_t> LocateValueStart(const std::string& raw, const std::string
     }
 
     return valuePos;
+}
+
+bool IsJsonValueTerminator(char c) {
+    switch (c) {
+        case ',':
+        case '}':
+        case ']':
+        case ' ':
+        case '\t':
+        case '\r':
+        case '\n':
+            return true;
+        default:
+            return false;
+    }
+}
+
+bool HasValidValueTerminator(const std::string& raw, size_t tokenEndPos) {
+    return tokenEndPos >= raw.size() || IsJsonValueTerminator(raw[tokenEndPos]);
 }
 
 std::optional<std::string> ExtractString(const std::string& raw, const std::string& key) {
@@ -96,10 +116,16 @@ std::optional<NumericType> ExtractNumber(const std::string& raw, const std::stri
             if (consumed == 0 || parsed < std::numeric_limits<int>::min() || parsed > std::numeric_limits<int>::max()) {
                 return std::nullopt;
             }
+            if (!HasValidValueTerminator(raw, *valuePos + consumed)) {
+                return std::nullopt;
+            }
             return static_cast<int>(parsed);
         } else {
             const float parsed = std::stof(raw.substr(*valuePos), &consumed);
             if (consumed == 0) {
+                return std::nullopt;
+            }
+            if (!HasValidValueTerminator(raw, *valuePos + consumed)) {
                 return std::nullopt;
             }
             return parsed;
@@ -123,10 +149,10 @@ std::optional<bool> ExtractBool(const std::string& raw, const std::string& key) 
         return std::nullopt;
     }
 
-    if (raw.compare(*valuePos, 4, "true") == 0) {
+    if (raw.compare(*valuePos, 4, "true") == 0 && HasValidValueTerminator(raw, *valuePos + 4)) {
         return true;
     }
-    if (raw.compare(*valuePos, 5, "false") == 0) {
+    if (raw.compare(*valuePos, 5, "false") == 0 && HasValidValueTerminator(raw, *valuePos + 5)) {
         return false;
     }
 
@@ -291,7 +317,18 @@ Settings SettingsStore::LoadWithValidation() {
 }
 
 bool SettingsStore::Save(const Settings& settings) {
-    std::ofstream out{std::filesystem::path(ConfigPath()), std::ios::trunc};
+    const std::filesystem::path configPath = std::filesystem::path(ConfigPath());
+    const std::filesystem::path parent = configPath.parent_path();
+
+    if (!parent.empty()) {
+        try {
+            std::filesystem::create_directories(parent);
+        } catch (...) {
+            return false;
+        }
+    }
+
+    std::ofstream out{configPath, std::ios::trunc};
     if (!out.is_open()) {
         return false;
     }

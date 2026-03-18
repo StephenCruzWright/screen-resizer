@@ -23,6 +23,14 @@ cmake -S . -B build -G "Visual Studio 17 2022" -A x64
 cmake --build build --config Release
 ```
 
+### Option 1A: CMake presets (recommended for repeatable Windows checks)
+
+```powershell
+cmake --preset windows-debug
+cmake --build --preset windows-debug --config Debug
+ctest --preset windows-debug -C Debug
+```
+
 ### Option 2: CMake + Ninja
 
 ```powershell
@@ -70,3 +78,22 @@ This project is licensed under the [MIT License](LICENSE).
 
 The app now persists settings to `%LocalAppData%/ScreenResizer/settings.json` and restores them at startup.
 Press `S` while the app is focused to open the Settings window for viewport/profile/startup options.
+
+## Windows Verification
+
+Run this from **Developer PowerShell for VS 2022** at the repo root:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\verify-windows.ps1
+```
+
+Optional:
+
+- clean build dir first: `-Clean`
+- release validation: `-Configuration Release`
+
+Example:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\verify-windows.ps1 -Clean -Configuration Release
+```
