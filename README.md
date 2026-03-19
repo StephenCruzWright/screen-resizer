@@ -26,9 +26,15 @@ cmake --build build --config Release
 ### Option 1A: CMake presets (recommended for repeatable Windows checks)
 
 ```powershell
-cmake --preset windows-debug
-cmake --build --preset windows-debug --config Debug
-ctest --preset windows-debug -C Debug
+# Visual Studio 2022 path
+cmake --preset windows-vs-debug
+cmake --build --preset windows-vs-debug --config Debug
+ctest --preset windows-vs-debug -C Debug
+
+# Ninja path
+cmake --preset windows-ninja-debug
+cmake --build --preset windows-ninja-debug
+ctest --preset windows-ninja-debug
 ```
 
 ### Option 2: CMake + Ninja
@@ -91,9 +97,10 @@ Optional:
 
 - clean build dir first: `-Clean`
 - release validation: `-Configuration Release`
+- force toolchain: `-Toolchain vs2022` or `-Toolchain ninja`
 
 Example:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\verify-windows.ps1 -Clean -Configuration Release
+powershell -ExecutionPolicy Bypass -File .\scripts\verify-windows.ps1 -Clean -Configuration Release -Toolchain ninja
 ```

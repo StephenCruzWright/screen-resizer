@@ -7,12 +7,19 @@
   },
   "configurePresets": [
     {
-      "name": "windows-debug",
+      "name": "windows-vs-debug",
       "displayName": "Windows Debug (VS 2022 x64)",
       "description": "Configure with Visual Studio 2022 for Windows debug validation.",
       "generator": "Visual Studio 17 2022",
       "architecture": "x64",
-      "binaryDir": "${sourceDir}/build-win",
+      "binaryDir": "${sourceDir}/build-win-vs"
+    },
+    {
+      "name": "windows-ninja-debug",
+      "displayName": "Windows Debug (Ninja)",
+      "description": "Configure with Ninja for debug validation on Windows.",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build-win-ninja",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug"
       }
@@ -20,16 +27,27 @@
   ],
   "buildPresets": [
     {
-      "name": "windows-debug",
-      "configurePreset": "windows-debug",
+      "name": "windows-vs-debug",
+      "configurePreset": "windows-vs-debug",
       "configuration": "Debug"
+    },
+    {
+      "name": "windows-ninja-debug",
+      "configurePreset": "windows-ninja-debug"
     }
   ],
   "testPresets": [
     {
-      "name": "windows-debug",
-      "configurePreset": "windows-debug",
+      "name": "windows-vs-debug",
+      "configurePreset": "windows-vs-debug",
       "configuration": "Debug",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "windows-ninja-debug",
+      "configurePreset": "windows-ninja-debug",
       "output": {
         "outputOnFailure": true
       }
